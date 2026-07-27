@@ -29,6 +29,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.51.1",
     "@tanstack/react-table": "^8.17.3",
+    "axios": "^1.7.9",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",

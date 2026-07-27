@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
+import { authService } from "@/services/api/auth.service"
 import type { LoginFormData } from "@/types"
 
 const loginSchema = z.object({
@@ -30,8 +31,7 @@ export function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true)
     try {
-      // Mock login - will be replaced with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await authService.login(data)
       toast.success("Login successful")
       navigate("/dashboard")
     } catch (error) {

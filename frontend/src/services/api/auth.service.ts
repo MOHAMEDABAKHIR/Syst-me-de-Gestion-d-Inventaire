@@ -1,93 +1,78 @@
 import type { User, LoginFormData, ActivateAccountFormData } from "@/types"
+import { apiClient, tokenStorage } from "./client"
 
-// Mock authentication service
-// This will be replaced with actual API calls to Django backend
+interface LoginResponse {
+  access: string
+  refresh: string
+  user: User
+}
+
+interface RefreshResponse {
+  access: string
+  refresh?: string
+}
 
 export const authService = {
+  /** POST /api/auth/login/ */
   async login(data: LoginFormData): Promise<{ user: User; accessToken: string; refreshToken: string }> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Mock response
-    return {
-      user: {
-        id: "1",
-        email: data.email,
-        firstName: "John",
-        lastName: "Doe",
-        fullName: "John Doe",
-        role: "WAREHOUSE_MANAGER",
-        department: "Warehouse Operations",
-        position: "Warehouse Manager",
-        employeeId: "EMP-001",
-        phone: "+212 600 123 456",
-        status: "ACTIVE",
-        createdAt: "2024-01-01T00:00:00Z",
-        updatedAt: "2024-07-20T10:00:00Z",
-      },
-      accessToken: "mock-access-token",
-      refreshToken: "mock-refresh-token",
-    }
+    const response = await apiClient.post<LoginResponse>("/auth/login/", data)
+    const { access, refresh, user } = response.data
+
+    tokenStorage.setTokens(access, refresh)
+
+    return { user, accessToken: access, refreshToken: refresh }
   },
 
+  /** POST /api/auth/logout/ */
   async logout(): Promise<void> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-    // Clear tokens from storage
-    localStorage.removeItem("accessToken")
-    localStorage.removeItem("refreshToken")
+    const refreshToken = tokenStorage.getRefreshToken()
+    try {
+      if (refreshToken) {
+        await apiClient.post("/auth/logout/", { refresh: refreshToken })
+      }
+    } finally {
+      tokenStorage.clear()
+    }
   },
 
+  /** POST /api/auth/activate/ */
   async activateAccount(data: ActivateAccountFormData): Promise<User> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Mock response
-    return {
-      id: "1",
-      email: "new.user@ocp.com",
-      firstName: data.firstName || "New",
-      lastName: data.lastName || "User",
-      fullName: `${data.firstName} ${data.lastName}`,
-      role: "VIEWER",
-      department: "Operations",
-      position: "Operator",
-      employeeId: "EMP-NEW",
-      status: "ACTIVE",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
+    const formData = new FormData()
+    formData.append("token", data.token)
+    formData.append("password", data.password)
+    formData.append("confirm_password", data.confirmPassword)
+    formData.append("terms_accepted", String(data.acceptTerms))
+
+    const response = await apiClient.post<User>("/auth/activate/", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    return response.data
   },
 
+  /** POST /api/auth/token/refresh/ */
   async refreshToken(): Promise<{ accessToken: string; refreshToken: string }> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    return {
-      accessToken: "new-mock-access-token",
-      refreshToken: "new-mock-refresh-token",
+    const refreshToken = tokenStorage.getRefreshToken()
+    if (!refreshToken) {
+      throw new Error("No refresh token available")
     }
+
+    const response = await apiClient.post<RefreshResponse>("/auth/token/refresh/", {
+      refresh: refreshToken,
+    })
+
+    const newRefreshToken = response.data.refresh ?? refreshToken
+    tokenStorage.setTokens(response.data.access, newRefreshToken)
+
+    return { accessToken: response.data.access, refreshToken: newRefreshToken }
   },
 
+  /** GET /api/auth/me/ */
   async getCurrentUser(): Promise<User> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    // Mock response
-    return {
-      id: "1",
-      email: "john.doe@ocp.com",
-      firstName: "John",
-      lastName: "Doe",
-      fullName: "John Doe",
-      role: "WAREHOUSE_MANAGER",
-      department: "Warehouse Operations",
-      position: "Warehouse Manager",
-      employeeId: "EMP-001",
-      phone: "+212 600 123 456",
-      status: "ACTIVE",
-      createdAt: "2024-01-01T00:00:00Z",
-      updatedAt: "2024-07-20T10:00:00Z",
-    }
+    const response = await apiClient.get<User>("/auth/me/")
+    return response.data
+  },
+
+  isAuthenticated(): boolean {
+    return Boolean(tokenStorage.getAccessToken())
   },
 }

@@ -1,0 +1,572 @@
+diff --git a/.gitignore b/.gitignore
+index c748db8..4d09583 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -10,8 +10,8 @@ dist/
+ downloads/
+ eggs/
+ .eggs/
+-lib/
+-lib64/
++/lib/
++/lib64/
+ parts/
+ sdist/
+ var/
+diff --git a/frontend/.env.example b/frontend/.env.example
+new file mode 100644
+index 0000000..03095e8
+--- /dev/null
++++ b/frontend/.env.example
+@@ -0,0 +1,4 @@
++# URL du backend Django (sans le /api final).
++# En dev, le proxy Vite (vite.config.ts) redirige déjà /api vers cette URL,
++# donc VITE_API_URL peut rester vide pour utiliser le proxy relatif.
++VITE_API_URL=http://localhost:8000
+diff --git a/frontend/package.json b/frontend/package.json
+index 4ee3cf0..60d402a 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -29,6 +29,7 @@
+     "@tailwindcss/vite": "^4.3.3",
+     "@tanstack/react-query": "^5.51.1",
+     "@tanstack/react-table": "^8.17.3",
++    "axios": "^1.7.9",
+     "class-variance-authority": "^0.7.0",
+     "clsx": "^2.1.1",
+     "date-fns": "^3.6.0",
+diff --git a/frontend/src/features/auth/pages/login-page.tsx b/frontend/src/features/auth/pages/login-page.tsx
+index 50b1e60..5616fb9 100644
+--- a/frontend/src/features/auth/pages/login-page.tsx
++++ b/frontend/src/features/auth/pages/login-page.tsx
+@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
+ import { Label } from "@/components/ui/label"
+ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+ import { toast } from "sonner"
++import { authService } from "@/services/api/auth.service"
+ import type { LoginFormData } from "@/types"
+ 
+ const loginSchema = z.object({
+@@ -30,8 +31,7 @@ export function LoginPage() {
+   const onSubmit = async (data: LoginFormData) => {
+     setIsLoading(true)
+     try {
+-      // Mock login - will be replaced with actual API call
+-      await new Promise(resolve => setTimeout(resolve, 1000))
++      await authService.login(data)
+       toast.success("Login successful")
+       navigate("/dashboard")
+     } catch (error) {
+diff --git a/frontend/src/lib/utils.ts b/frontend/src/lib/utils.ts
+new file mode 100644
+index 0000000..bd0c391
+--- /dev/null
++++ b/frontend/src/lib/utils.ts
+@@ -0,0 +1,6 @@
++import { clsx, type ClassValue } from "clsx"
++import { twMerge } from "tailwind-merge"
++
++export function cn(...inputs: ClassValue[]) {
++  return twMerge(clsx(inputs))
++}
+diff --git a/frontend/src/services/api/auth.service.ts b/frontend/src/services/api/auth.service.ts
+index d6ab916..3e5c55d 100644
+--- a/frontend/src/services/api/auth.service.ts
++++ b/frontend/src/services/api/auth.service.ts
+@@ -1,93 +1,78 @@
+ import type { User, LoginFormData, ActivateAccountFormData } from "@/types"
++import { apiClient, tokenStorage } from "./client"
+ 
+-// Mock authentication service
+-// This will be replaced with actual API calls to Django backend
++interface LoginResponse {
++  access: string
++  refresh: string
++  user: User
++}
++
++interface RefreshResponse {
++  access: string
++  refresh?: string
++}
+ 
+ export const authService = {
++  /** POST /api/auth/login/ */
+   async login(data: LoginFormData): Promise<{ user: User; accessToken: string; refreshToken: string }> {
+-    // Simulate API call delay
+-    await new Promise(resolve => setTimeout(resolve, 1000))
+-    
+-    // Mock response
+-    return {
+-      user: {
+-        id: "1",
+-        email: data.email,
+-        firstName: "John",
+-        lastName: "Doe",
+-        fullName: "John Doe",
+-        role: "WAREHOUSE_MANAGER",
+-        department: "Warehouse Operations",
+-        position: "Warehouse Manager",
+-        employeeId: "EMP-001",
+-        phone: "+212 600 123 456",
+-        status: "ACTIVE",
+-        createdAt: "2024-01-01T00:00:00Z",
+-        updatedAt: "2024-07-20T10:00:00Z",
+-      },
+-      accessToken: "mock-access-token",
+-      refreshToken: "mock-refresh-token",
+-    }
++    const response = await apiClient.post<LoginResponse>("/auth/login/", data)
++    const { access, refresh, user } = response.data
++
++    tokenStorage.setTokens(access, refresh)
++
++    return { user, accessToken: access, refreshToken: refresh }
+   },
+ 
++  /** POST /api/auth/logout/ */
+   async logout(): Promise<void> {
+-    // Simulate API call delay
+-    await new Promise(resolve => setTimeout(resolve, 500))
+-    // Clear tokens from storage
+-    localStorage.removeItem("accessToken")
+-    localStorage.removeItem("refreshToken")
++    const refreshToken = tokenStorage.getRefreshToken()
++    try {
++      if (refreshToken) {
++        await apiClient.post("/auth/logout/", { refresh: refreshToken })
++      }
++    } finally {
++      tokenStorage.clear()
++    }
+   },
+ 
++  /** POST /api/auth/activate/ */
+   async activateAccount(data: ActivateAccountFormData): Promise<User> {
+-    // Simulate API call delay
+-    await new Promise(resolve => setTimeout(resolve, 1000))
+-    
+-    // Mock response
+-    return {
+-      id: "1",
+-      email: "new.user@ocp.com",
+-      firstName: data.firstName || "New",
+-      lastName: data.lastName || "User",
+-      fullName: `${data.firstName} ${data.lastName}`,
+-      role: "VIEWER",
+-      department: "Operations",
+-      position: "Operator",
+-      employeeId: "EMP-NEW",
+-      status: "ACTIVE",
+-      createdAt: new Date().toISOString(),
+-      updatedAt: new Date().toISOString(),
+-    }
++    const formData = new FormData()
++    formData.append("token", data.token)
++    formData.append("password", data.password)
++    formData.append("confirm_password", data.confirmPassword)
++    formData.append("terms_accepted", String(data.acceptTerms))
++
++    const response = await apiClient.post<User>("/auth/activate/", formData, {
++      headers: { "Content-Type": "multipart/form-data" },
++    })
++    return response.data
+   },
+ 
++  /** POST /api/auth/token/refresh/ */
+   async refreshToken(): Promise<{ accessToken: string; refreshToken: string }> {
+-    // Simulate API call delay
+-    await new Promise(resolve => setTimeout(resolve, 500))
+-    
+-    return {
+-      accessToken: "new-mock-access-token",
+-      refreshToken: "new-mock-refresh-token",
++    const refreshToken = tokenStorage.getRefreshToken()
++    if (!refreshToken) {
++      throw new Error("No refresh token available")
+     }
++
++    const response = await apiClient.post<RefreshResponse>("/auth/token/refresh/", {
++      refresh: refreshToken,
++    })
++
++    const newRefreshToken = response.data.refresh ?? refreshToken
++    tokenStorage.setTokens(response.data.access, newRefreshToken)
++
++    return { accessToken: response.data.access, refreshToken: newRefreshToken }
+   },
+ 
++  /** GET /api/auth/me/ */
+   async getCurrentUser(): Promise<User> {
+-    // Simulate API call delay
+-    await new Promise(resolve => setTimeout(resolve, 500))
+-    
+-    // Mock response
+-    return {
+-      id: "1",
+-      email: "john.doe@ocp.com",
+-      firstName: "John",
+-      lastName: "Doe",
+-      fullName: "John Doe",
+-      role: "WAREHOUSE_MANAGER",
+-      department: "Warehouse Operations",
+-      position: "Warehouse Manager",
+-      employeeId: "EMP-001",
+-      phone: "+212 600 123 456",
+-      status: "ACTIVE",
+-      createdAt: "2024-01-01T00:00:00Z",
+-      updatedAt: "2024-07-20T10:00:00Z",
+-    }
++    const response = await apiClient.get<User>("/auth/me/")
++    return response.data
++  },
++
++  isAuthenticated(): boolean {
++    return Boolean(tokenStorage.getAccessToken())
+   },
+ }
+diff --git a/frontend/src/services/api/case-mapper.ts b/frontend/src/services/api/case-mapper.ts
+new file mode 100644
+index 0000000..df8b433
+--- /dev/null
++++ b/frontend/src/services/api/case-mapper.ts
+@@ -0,0 +1,47 @@
++/**
++ * Django/DRF renvoie du snake_case (internal_code, created_at, ...).
++ * Le frontend travaille en camelCase (internalCode, createdAt, ...).
++ * Ces helpers convertissent automatiquement dans les deux sens,
++ * récursivement, pour objets et tableaux.
++ */
++
++const isPlainObject = (value: unknown): value is Record<string, unknown> =>
++  typeof value === "object" &&
++  value !== null &&
++  !Array.isArray(value) &&
++  !(value instanceof File) &&
++  !(value instanceof Date)
++
++const snakeToCamel = (key: string): string =>
++  key.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase())
++
++const camelToSnake = (key: string): string =>
++  key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
++
++export function toCamelCase<T = unknown>(input: unknown): T {
++  if (Array.isArray(input)) {
++    return input.map((item) => toCamelCase(item)) as unknown as T
++  }
++  if (isPlainObject(input)) {
++    const result: Record<string, unknown> = {}
++    for (const [key, value] of Object.entries(input)) {
++      result[snakeToCamel(key)] = toCamelCase(value)
++    }
++    return result as T
++  }
++  return input as T
++}
++
++export function toSnakeCase<T = unknown>(input: unknown): T {
++  if (Array.isArray(input)) {
++    return input.map((item) => toSnakeCase(item)) as unknown as T
++  }
++  if (isPlainObject(input)) {
++    const result: Record<string, unknown> = {}
++    for (const [key, value] of Object.entries(input)) {
++      result[camelToSnake(key)] = toSnakeCase(value)
++    }
++    return result as T
++  }
++  return input as T
++}
+diff --git a/frontend/src/services/api/client.ts b/frontend/src/services/api/client.ts
+new file mode 100644
+index 0000000..3542fc4
+--- /dev/null
++++ b/frontend/src/services/api/client.ts
+@@ -0,0 +1,132 @@
++import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios"
++import { toCamelCase, toSnakeCase } from "./case-mapper"
++
++// En dev, Vite proxy /api vers VITE_API_URL (voir vite.config.ts).
++// En prod, VITE_API_URL doit pointer vers le domaine réel du backend.
++const API_BASE_URL = import.meta.env.VITE_API_URL ?? ""
++
++export const ACCESS_TOKEN_KEY = "accessToken"
++export const REFRESH_TOKEN_KEY = "refreshToken"
++
++export const tokenStorage = {
++  getAccessToken: () => localStorage.getItem(ACCESS_TOKEN_KEY),
++  getRefreshToken: () => localStorage.getItem(REFRESH_TOKEN_KEY),
++  setTokens: (accessToken: string, refreshToken: string) => {
++    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
++    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
++  },
++  clear: () => {
++    localStorage.removeItem(ACCESS_TOKEN_KEY)
++    localStorage.removeItem(REFRESH_TOKEN_KEY)
++  },
++}
++
++export const apiClient = axios.create({
++  baseURL: `${API_BASE_URL}/api`,
++  headers: {
++    "Content-Type": "application/json",
++  },
++})
++
++// --- Requête sortante : camelCase -> snake_case + injection du token ---
++apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
++  const token = tokenStorage.getAccessToken()
++  if (token && config.headers) {
++    config.headers.Authorization = `Bearer ${token}`
++  }
++
++  // On ne touche pas à FormData (upload de fichiers)
++  if (config.data && !(config.data instanceof FormData)) {
++    config.data = toSnakeCase(config.data)
++  }
++  if (config.params) {
++    config.params = toSnakeCase(config.params)
++  }
++
++  return config
++})
++
++// --- Réponse entrante : snake_case -> camelCase ---
++apiClient.interceptors.response.use((response) => {
++  if (response.data) {
++    response.data = toCamelCase(response.data)
++  }
++  return response
++})
++
++// --- Rafraîchissement automatique du token sur 401 ---
++let isRefreshing = false
++let pendingQueue: Array<(token: string | null) => void> = []
++
++function resolvePendingQueue(token: string | null) {
++  pendingQueue.forEach((callback) => callback(token))
++  pendingQueue = []
++}
++
++apiClient.interceptors.response.use(
++  (response) => response,
++  async (error: AxiosError) => {
++    const originalRequest = error.config as
++      | (InternalAxiosRequestConfig & { _retry?: boolean })
++      | undefined
++
++    if (error.response?.status !== 401 || !originalRequest || originalRequest._retry) {
++      return Promise.reject(error)
++    }
++
++    // Évite une boucle infinie sur l'endpoint de login/refresh lui-même
++    if (
++      originalRequest.url?.includes("/auth/login/") ||
++      originalRequest.url?.includes("/auth/token/refresh/")
++    ) {
++      tokenStorage.clear()
++      return Promise.reject(error)
++    }
++
++    const refreshToken = tokenStorage.getRefreshToken()
++    if (!refreshToken) {
++      tokenStorage.clear()
++      window.location.href = "/login"
++      return Promise.reject(error)
++    }
++
++    if (isRefreshing) {
++      return new Promise((resolve, reject) => {
++        pendingQueue.push((newToken) => {
++          if (!newToken) {
++            reject(error)
++            return
++          }
++          originalRequest._retry = true
++          originalRequest.headers = originalRequest.headers ?? {}
++          originalRequest.headers.Authorization = `Bearer ${newToken}`
++          resolve(apiClient(originalRequest))
++        })
++      })
++    }
++
++    isRefreshing = true
++    try {
++      const { data } = await axios.post(`${API_BASE_URL}/api/auth/token/refresh/`, {
++        refresh: refreshToken,
++      })
++      const newAccessToken: string = data.access
++      const newRefreshToken: string = data.refresh ?? refreshToken
++
++      tokenStorage.setTokens(newAccessToken, newRefreshToken)
++      resolvePendingQueue(newAccessToken)
++
++      originalRequest._retry = true
++      originalRequest.headers = originalRequest.headers ?? {}
++      originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
++      return apiClient(originalRequest)
++    } catch (refreshError) {
++      resolvePendingQueue(null)
++      tokenStorage.clear()
++      window.location.href = "/login"
++      return Promise.reject(refreshError)
++    } finally {
++      isRefreshing = false
++    }
++  }
++)
+diff --git a/frontend/src/services/api/products.service.ts b/frontend/src/services/api/products.service.ts
+index c254102..484c65e 100644
+--- a/frontend/src/services/api/products.service.ts
++++ b/frontend/src/services/api/products.service.ts
+@@ -1,103 +1,49 @@
+ import type { Product, ProductFormData, TableParams, PaginatedResponse } from "@/types"
+-import { mockProducts } from "./mock-data"
+-
+-// Mock products service
+-// This will be replaced with actual API calls to Django backend
++import { apiClient } from "./client"
+ 
+ export const productsService = {
++  /** GET /api/inventory/products/ */
+   async getProducts(params?: TableParams): Promise<PaginatedResponse<Product>> {
+-    // Simulate API call delay
+-    await new Promise(resolve => setTimeout(resolve, 500))
+-    
+-    let filteredProducts = [...mockProducts]
+-    
+-    // Apply search filter
+-    if (params?.search) {
+-      const searchLower = params.search.toLowerCase()
+-      filteredProducts = filteredProducts.filter(
+-        product =>
+-          product.name.toLowerCase().includes(searchLower) ||
+-          product.internalCode.toLowerCase().includes(searchLower) ||
+-          product.barcode?.toLowerCase().includes(searchLower)
+-      )
+-    }
+-    
+-    // Apply status filter
+-    if (params?.status) {
+-      filteredProducts = filteredProducts.filter(product => product.status === params.status)
+-    }
+-    
+-    // Apply pagination
+-    const page = params?.page || 1
+-    const pageSize = params?.pageSize || 10
+-    const startIndex = (page - 1) * pageSize
+-    const endIndex = startIndex + pageSize
+-    
+-    return {
+-      results: filteredProducts.slice(startIndex, endIndex),
+-      count: filteredProducts.length,
+-      next: endIndex < filteredProducts.length ? `/api/products?page=${page + 1}` : null,
+-      previous: page > 1 ? `/api/products?page=${page - 1}` : null,
+-    }
++    const response = await apiClient.get<PaginatedResponse<Product>>("/inventory/products/", {
++      params: {
++        page: params?.page,
++        pageSize: params?.pageSize,
++        search: params?.search,
++        status: params?.status,
++        ordering: params?.field
++          ? `${params.direction === "desc" ? "-" : ""}${params.field}`
++          : undefined,
++      },
++    })
++    return response.data
+   },
+ 
++  /** GET /api/inventory/products/{id}/ */
+   async getProduct(id: string): Promise<Product> {
+-    // Simulate API call delay
+-    await new Promise(resolve => setTimeout(resolve, 300))
+-    
+-    const product = mockProducts.find(p => p.id === id)
+-    if (!product) {
+-      throw new Error("Product not found")
+-    }
+-    return product
++    const response = await apiClient.get<Product>(`/inventory/products/${id}/`)
++    return response.data
+   },
+ 
++  /** POST /api/inventory/products/ */
+   async createProduct(data: ProductFormData): Promise<Product> {
+-    // Simulate API call delay
+-    await new Promise(resolve => setTimeout(resolve, 800))
+-    
+-    const newProduct: Product = {
+-      id: Math.random().toString(36).substr(2, 9),
+-      ...data,
+-      currentStock: 0,
+-      reservedStock: 0,
+-      availableStock: 0,
+-      status: "active",
+-      createdAt: new Date().toISOString(),
+-      updatedAt: new Date().toISOString(),
+-    }
+-    
+-    mockProducts.push(newProduct)
+-    return newProduct
++    const response = await apiClient.post<Product>("/inventory/products/", data)
++    return response.data
+   },
+ 
++  /** PATCH /api/inventory/products/{id}/ */
+   async updateProduct(id: string, data: Partial<ProductFormData>): Promise<Product> {
+-    // Simulate API call delay
+-    await new Promise(resolve => setTimeout(resolve, 800))
+-    
+-    const index = mockProducts.findIndex(p => p.id === id)
+-    if (index === -1) {
+-      throw new Error("Product not found")
+-    }
+-    
+-    mockProducts[index] = {
+-      ...mockProducts[index],
+-      ...data,
+-      updatedAt: new Date().toISOString(),
+-    }
+-    
+-    return mockProducts[index]
++    const response = await apiClient.patch<Product>(`/inventory/products/${id}/`, data)
++    return response.data
+   },
+ 
++  /** DELETE /api/inventory/products/{id}/ */
+   async deleteProduct(id: string): Promise<void> {
+-    // Simulate API call delay
+-    await new Promise(resolve => setTimeout(resolve, 500))
+-    
+-    const index = mockProducts.findIndex(p => p.id === id)
+-    if (index === -1) {
+-      throw new Error("Product not found")
+-    }
+-    
+-    mockProducts.splice(index, 1)
++    await apiClient.delete(`/inventory/products/${id}/`)
++  },
++
++  /** GET /api/inventory/products/barcode/{barcode}/ */
++  async getProductByBarcode(barcode: string): Promise<Product> {
++    const response = await apiClient.get<Product>(`/inventory/products/barcode/${barcode}/`)
++    return response.data
+   },
+ }
+diff --git a/frontend/src/vite-env.d.ts b/frontend/src/vite-env.d.ts
+new file mode 100644
+index 0000000..b54b4c9
+--- /dev/null
++++ b/frontend/src/vite-env.d.ts
+@@ -0,0 +1,9 @@
++/// <reference types="vite/client" />
++
++interface ImportMetaEnv {
++  readonly VITE_API_URL: string
++}
++
++interface ImportMeta {
++  readonly env: ImportMetaEnv
++}

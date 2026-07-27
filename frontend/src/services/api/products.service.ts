@@ -1,103 +1,49 @@
 import type { Product, ProductFormData, TableParams, PaginatedResponse } from "@/types"
-import { mockProducts } from "./mock-data"
-
-// Mock products service
-// This will be replaced with actual API calls to Django backend
+import { apiClient } from "./client"
 
 export const productsService = {
+  /** GET /api/inventory/products/ */
   async getProducts(params?: TableParams): Promise<PaginatedResponse<Product>> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    let filteredProducts = [...mockProducts]
-    
-    // Apply search filter
-    if (params?.search) {
-      const searchLower = params.search.toLowerCase()
-      filteredProducts = filteredProducts.filter(
-        product =>
-          product.name.toLowerCase().includes(searchLower) ||
-          product.internalCode.toLowerCase().includes(searchLower) ||
-          product.barcode?.toLowerCase().includes(searchLower)
-      )
-    }
-    
-    // Apply status filter
-    if (params?.status) {
-      filteredProducts = filteredProducts.filter(product => product.status === params.status)
-    }
-    
-    // Apply pagination
-    const page = params?.page || 1
-    const pageSize = params?.pageSize || 10
-    const startIndex = (page - 1) * pageSize
-    const endIndex = startIndex + pageSize
-    
-    return {
-      results: filteredProducts.slice(startIndex, endIndex),
-      count: filteredProducts.length,
-      next: endIndex < filteredProducts.length ? `/api/products?page=${page + 1}` : null,
-      previous: page > 1 ? `/api/products?page=${page - 1}` : null,
-    }
+    const response = await apiClient.get<PaginatedResponse<Product>>("/inventory/products/", {
+      params: {
+        page: params?.page,
+        pageSize: params?.pageSize,
+        search: params?.search,
+        status: params?.status,
+        ordering: params?.field
+          ? `${params.direction === "desc" ? "-" : ""}${params.field}`
+          : undefined,
+      },
+    })
+    return response.data
   },
 
+  /** GET /api/inventory/products/{id}/ */
   async getProduct(id: string): Promise<Product> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 300))
-    
-    const product = mockProducts.find(p => p.id === id)
-    if (!product) {
-      throw new Error("Product not found")
-    }
-    return product
+    const response = await apiClient.get<Product>(`/inventory/products/${id}/`)
+    return response.data
   },
 
+  /** POST /api/inventory/products/ */
   async createProduct(data: ProductFormData): Promise<Product> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    const newProduct: Product = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...data,
-      currentStock: 0,
-      reservedStock: 0,
-      availableStock: 0,
-      status: "active",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    
-    mockProducts.push(newProduct)
-    return newProduct
+    const response = await apiClient.post<Product>("/inventory/products/", data)
+    return response.data
   },
 
+  /** PATCH /api/inventory/products/{id}/ */
   async updateProduct(id: string, data: Partial<ProductFormData>): Promise<Product> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    const index = mockProducts.findIndex(p => p.id === id)
-    if (index === -1) {
-      throw new Error("Product not found")
-    }
-    
-    mockProducts[index] = {
-      ...mockProducts[index],
-      ...data,
-      updatedAt: new Date().toISOString(),
-    }
-    
-    return mockProducts[index]
+    const response = await apiClient.patch<Product>(`/inventory/products/${id}/`, data)
+    return response.data
   },
 
+  /** DELETE /api/inventory/products/{id}/ */
   async deleteProduct(id: string): Promise<void> {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    const index = mockProducts.findIndex(p => p.id === id)
-    if (index === -1) {
-      throw new Error("Product not found")
-    }
-    
-    mockProducts.splice(index, 1)
+    await apiClient.delete(`/inventory/products/${id}/`)
+  },
+
+  /** GET /api/inventory/products/barcode/{barcode}/ */
+  async getProductByBarcode(barcode: string): Promise<Product> {
+    const response = await apiClient.get<Product>(`/inventory/products/barcode/${barcode}/`)
+    return response.data
   },
 }
