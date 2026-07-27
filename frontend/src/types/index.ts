@@ -106,6 +106,8 @@ export interface Warehouse {
   code: string
   location?: string
   capacity?: number
+  totalCapacity?: number
+  usedCapacity?: number
   managerId?: string
   managerName?: string
   status: "active" | "inactive"

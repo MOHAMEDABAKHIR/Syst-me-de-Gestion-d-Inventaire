@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
+import { authService } from "@/services/api/auth.service"
 import type { ActivateAccountFormData } from "@/types"
 
 const activateAccountSchema = z.object({
@@ -36,10 +37,13 @@ export function ActivateAccountPage() {
   })
 
   const onSubmit = async (data: ActivateAccountFormData) => {
+    if (!token) {
+      toast.error("Missing or invalid activation link")
+      return
+    }
     setIsLoading(true)
     try {
-      // Mock activation - will be replaced with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await authService.activateAccount({ ...data, token })
       toast.success("Account activated successfully")
       navigate("/login")
     } catch (error) {

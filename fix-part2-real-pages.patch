@@ -1,0 +1,709 @@
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 93e3aad..b603a39 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+ import { Toaster } from "sonner"
+ import { MainLayout } from "@/components/layouts/main-layout"
+ import { AuthLayout } from "@/components/layouts/auth-layout"
++import { ProtectedRoute } from "@/components/shared/protected-route"
+ 
+ // Pages
+ import { LoginPage } from "@/features/auth/pages/login-page"
+@@ -34,7 +35,14 @@ function App() {
+           <Route path="/activate/:token" element={<AuthLayout><ActivateAccountPage /></AuthLayout>} />
+           
+           {/* Protected Routes */}
+-          <Route path="/" element={<MainLayout />}>
++          <Route
++            path="/"
++            element={
++              <ProtectedRoute>
++                <MainLayout />
++              </ProtectedRoute>
++            }
++          >
+             <Route index element={<Navigate to="/dashboard" replace />} />
+             <Route path="dashboard" element={<DashboardPage />} />
+             <Route path="inventory" element={<ProductsPage />} />
+diff --git a/frontend/src/components/shared/protected-route.tsx b/frontend/src/components/shared/protected-route.tsx
+new file mode 100644
+index 0000000..d34cee2
+--- /dev/null
++++ b/frontend/src/components/shared/protected-route.tsx
+@@ -0,0 +1,9 @@
++import { Navigate } from "react-router-dom"
++import { authService } from "@/services/api/auth.service"
++
++export function ProtectedRoute({ children }: { children: React.ReactNode }) {
++  if (!authService.isAuthenticated()) {
++    return <Navigate to="/login" replace />
++  }
++  return <>{children}</>
++}
+diff --git a/frontend/src/features/auth/pages/activate-account-page.tsx b/frontend/src/features/auth/pages/activate-account-page.tsx
+index e7ae41b..f28f93e 100644
+--- a/frontend/src/features/auth/pages/activate-account-page.tsx
++++ b/frontend/src/features/auth/pages/activate-account-page.tsx
+@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+ import { Checkbox } from "@/components/ui/checkbox"
+ import { toast } from "sonner"
++import { authService } from "@/services/api/auth.service"
+ import type { ActivateAccountFormData } from "@/types"
+ 
+ const activateAccountSchema = z.object({
+@@ -36,10 +37,13 @@ export function ActivateAccountPage() {
+   })
+ 
+   const onSubmit = async (data: ActivateAccountFormData) => {
++    if (!token) {
++      toast.error("Missing or invalid activation link")
++      return
++    }
+     setIsLoading(true)
+     try {
+-      // Mock activation - will be replaced with actual API call
+-      await new Promise(resolve => setTimeout(resolve, 1000))
++      await authService.activateAccount({ ...data, token })
+       toast.success("Account activated successfully")
+       navigate("/login")
+     } catch (error) {
+diff --git a/frontend/src/features/dashboard/pages/dashboard-page.tsx b/frontend/src/features/dashboard/pages/dashboard-page.tsx
+index 98207c8..78fa8e0 100644
+--- a/frontend/src/features/dashboard/pages/dashboard-page.tsx
++++ b/frontend/src/features/dashboard/pages/dashboard-page.tsx
+@@ -1,17 +1,47 @@
++import { useQuery } from "@tanstack/react-query"
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+-import { Badge } from "@/components/ui/badge"
+-import { Button } from "@/components/ui/button"
+-import { 
+-  Package, 
+-  Building2, 
+-  TrendingUp, 
+-  AlertTriangle, 
++import {
++  Package,
++  Building2,
++  TrendingUp,
++  AlertTriangle,
+   Clock,
+-  Users,
+-  ArrowRight
++  Loader2,
+ } from "lucide-react"
++import { dashboardService } from "@/services/api/dashboard.service"
++
++function formatCurrency(value: number): string {
++  return new Intl.NumberFormat("en-US", {
++    style: "currency",
++    currency: "USD",
++    notation: "compact",
++    maximumFractionDigits: 1,
++  }).format(value)
++}
++
++function timeAgo(isoDate: string): string {
++  const diffMs = Date.now() - new Date(isoDate).getTime()
++  const minutes = Math.floor(diffMs / 60000)
++  if (minutes < 1) return "just now"
++  if (minutes < 60) return `${minutes} min ago`
++  const hours = Math.floor(minutes / 60)
++  if (hours < 24) return `${hours}h ago`
++  return `${Math.floor(hours / 24)}d ago`
++}
+ 
+ export function DashboardPage() {
++  const statsQuery = useQuery({
++    queryKey: ["dashboard", "overview"],
++    queryFn: () => dashboardService.getOverviewStats(),
++  })
++
++  const activityQuery = useQuery({
++    queryKey: ["dashboard", "recent-activity"],
++    queryFn: () => dashboardService.getRecentActivity(6),
++  })
++
++  const stats = statsQuery.data
++
+   return (
+     <div className="space-y-6">
+       <div>
+@@ -19,6 +49,12 @@ export function DashboardPage() {
+         <p className="text-slate-500 mt-1">Overview of your inventory system</p>
+       </div>
+ 
++      {statsQuery.isError && (
++        <p className="py-4 text-center text-danger">
++          Failed to load dashboard stats. Is the backend running?
++        </p>
++      )}
++
+       {/* Stats Cards */}
+       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+         <Card>
+@@ -27,8 +63,9 @@ export function DashboardPage() {
+             <Package className="h-4 w-4 text-slate-500" />
+           </CardHeader>
+           <CardContent>
+-            <div className="text-2xl font-bold">1,234</div>
+-            <p className="text-xs text-slate-500">+12% from last month</p>
++            <div className="text-2xl font-bold">
++              {statsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : stats?.totalProducts ?? 0}
++            </div>
+           </CardContent>
+         </Card>
+         <Card>
+@@ -37,8 +74,9 @@ export function DashboardPage() {
+             <Building2 className="h-4 w-4 text-slate-500" />
+           </CardHeader>
+           <CardContent>
+-            <div className="text-2xl font-bold">8</div>
+-            <p className="text-xs text-slate-500">Across 3 locations</p>
++            <div className="text-2xl font-bold">
++              {statsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : stats?.totalWarehouses ?? 0}
++            </div>
+           </CardContent>
+         </Card>
+         <Card>
+@@ -47,8 +85,13 @@ export function DashboardPage() {
+             <TrendingUp className="h-4 w-4 text-slate-500" />
+           </CardHeader>
+           <CardContent>
+-            <div className="text-2xl font-bold">$2.4M</div>
+-            <p className="text-xs text-slate-500">+8% from last month</p>
++            <div className="text-2xl font-bold">
++              {statsQuery.isLoading ? (
++                <Loader2 className="h-5 w-5 animate-spin" />
++              ) : (
++                formatCurrency(stats?.totalStockValue ?? 0)
++              )}
++            </div>
+           </CardContent>
+         </Card>
+         <Card>
+@@ -57,87 +100,54 @@ export function DashboardPage() {
+             <AlertTriangle className="h-4 w-4 text-danger" />
+           </CardHeader>
+           <CardContent>
+-            <div className="text-2xl font-bold text-danger">23</div>
++            <div className="text-2xl font-bold text-danger">
++              {statsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : stats?.criticalStock ?? 0}
++            </div>
+             <p className="text-xs text-slate-500">Products below minimum</p>
+           </CardContent>
+         </Card>
+       </div>
+ 
+-      {/* Pending Requests and Recent Activity */}
+-      <div className="grid gap-4 md:grid-cols-2">
+-        <Card>
+-          <CardHeader>
+-            <CardTitle>Pending Requests</CardTitle>
+-            <CardDescription>Stock requests awaiting approval</CardDescription>
+-          </CardHeader>
+-          <CardContent>
+-            <div className="space-y-4">
+-              {[1, 2, 3].map((i) => (
+-                <div key={i} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+-                  <div className="flex-1">
+-                    <p className="font-medium text-sm">Request #{1000 + i}</p>
+-                    <p className="text-xs text-slate-500">Product XYZ - 50 units</p>
+-                  </div>
+-                  <Badge variant="warning">Pending</Badge>
+-                </div>
+-              ))}
+-              <Button variant="outline" className="w-full">
+-                View All Requests
+-                <ArrowRight className="ml-2 h-4 w-4" />
+-              </Button>
++      {/* Recent Activity */}
++      <Card>
++        <CardHeader>
++          <CardTitle>Recent Activity</CardTitle>
++          <CardDescription>Latest system events</CardDescription>
++        </CardHeader>
++        <CardContent>
++          {activityQuery.isLoading && (
++            <div className="flex items-center justify-center py-8 text-slate-400">
++              <Loader2 className="h-5 w-5 animate-spin" />
+             </div>
+-          </CardContent>
+-        </Card>
++          )}
+ 
+-        <Card>
+-          <CardHeader>
+-            <CardTitle>Recent Activity</CardTitle>
+-            <CardDescription>Latest system events</CardDescription>
+-          </CardHeader>
+-          <CardContent>
++          {activityQuery.isError && (
++            <p className="py-4 text-center text-danger">Failed to load recent activity.</p>
++          )}
++
++          {!activityQuery.isLoading && !activityQuery.isError && (activityQuery.data?.length ?? 0) === 0 && (
++            <p className="py-4 text-center text-slate-500">No recent activity.</p>
++          )}
++
++          {!activityQuery.isLoading && (activityQuery.data?.length ?? 0) > 0 && (
+             <div className="space-y-4">
+-              {[1, 2, 3, 4].map((i) => (
+-                <div key={i} className="flex items-start gap-3">
++              {activityQuery.data!.map((activity) => (
++                <div key={activity.id} className="flex items-start gap-3">
+                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                     <Clock className="h-4 w-4 text-primary" />
+                   </div>
+                   <div className="flex-1">
+-                    <p className="text-sm font-medium">Stock movement completed</p>
+-                    <p className="text-xs text-slate-500">2 hours ago by John Doe</p>
++                    <p className="text-sm font-medium">
++                      {activity.action} · {activity.entity}
++                    </p>
++                    <p className="text-xs text-slate-500">
++                      {timeAgo(activity.timestamp)} by {activity.user}
++                    </p>
+                   </div>
+                 </div>
+               ))}
+             </div>
+-          </CardContent>
+-        </Card>
+-      </div>
+-
+-      {/* Low Stock Alerts */}
+-      <Card>
+-        <CardHeader>
+-          <CardTitle>Low Stock Alerts</CardTitle>
+-          <CardDescription>Products that need immediate attention</CardDescription>
+-        </CardHeader>
+-        <CardContent>
+-          <div className="space-y-3">
+-            {[1, 2, 3, 4, 5].map((i) => (
+-              <div key={i} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+-                <div className="flex items-center gap-4">
+-                  <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center">
+-                    <Package className="h-5 w-5 text-slate-500" />
+-                  </div>
+-                  <div>
+-                    <p className="font-medium text-sm">Product {i}</p>
+-                    <p className="text-xs text-slate-500">Warehouse A - Zone 1</p>
+-                  </div>
+-                </div>
+-                <div className="text-right">
+-                  <p className="font-medium text-sm text-danger">{10 - i} units</p>
+-                  <p className="text-xs text-slate-500">Min: 50</p>
+-                </div>
+-              </div>
+-            ))}
+-          </div>
++          )}
+         </CardContent>
+       </Card>
+     </div>
+diff --git a/frontend/src/features/inventory/pages/products-page.tsx b/frontend/src/features/inventory/pages/products-page.tsx
+index 7eb1d4b..f46f47f 100644
+--- a/frontend/src/features/inventory/pages/products-page.tsx
++++ b/frontend/src/features/inventory/pages/products-page.tsx
+@@ -1,16 +1,29 @@
++import { useState } from "react"
++import { useQuery } from "@tanstack/react-query"
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+ import { Button } from "@/components/ui/button"
+ import { Input } from "@/components/ui/input"
+ import { Badge } from "@/components/ui/badge"
+-import { 
+-  Search, 
+-  Plus, 
++import {
++  Search,
++  Plus,
+   Filter,
+   MoreVertical,
+-  Package
++  Package,
++  Loader2,
+ } from "lucide-react"
++import { productsService } from "@/services/api/products.service"
+ 
+ export function ProductsPage() {
++  const [search, setSearch] = useState("")
++
++  const { data, isLoading, isError } = useQuery({
++    queryKey: ["products", { search }],
++    queryFn: () => productsService.getProducts({ search, page: 1, pageSize: 20 } as any),
++  })
++
++  const products = data?.results ?? []
++
+   return (
+     <div className="space-y-6">
+       <div className="flex items-center justify-between">
+@@ -30,9 +43,11 @@ export function ProductsPage() {
+           <div className="flex gap-4">
+             <div className="flex-1 relative">
+               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+-              <Input 
+-                placeholder="Search products..." 
++              <Input
++                placeholder="Search products..."
+                 className="pl-10"
++                value={search}
++                onChange={(e) => setSearch(e.target.value)}
+               />
+             </div>
+             <Button variant="outline">
+@@ -47,36 +62,59 @@ export function ProductsPage() {
+       <Card>
+         <CardHeader>
+           <CardTitle>All Products</CardTitle>
+-          <CardDescription>1,234 products in inventory</CardDescription>
++          <CardDescription>
++            {isLoading ? "Loading..." : `${data?.count ?? 0} products in inventory`}
++          </CardDescription>
+         </CardHeader>
+         <CardContent>
+-          <div className="space-y-3">
+-            {[1, 2, 3, 4, 5].map((i) => (
+-              <div key={i} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+-                <div className="flex items-center gap-4">
+-                  <div className="h-12 w-12 rounded-lg bg-slate-100 flex items-center justify-center">
+-                    <Package className="h-6 w-6 text-slate-500" />
+-                  </div>
+-                  <div>
+-                    <p className="font-medium">Product {i}</p>
+-                    <p className="text-sm text-slate-500">SKU: PRD-{1000 + i}</p>
++          {isLoading && (
++            <div className="flex items-center justify-center py-12 text-slate-400">
++              <Loader2 className="h-6 w-6 animate-spin" />
++            </div>
++          )}
++
++          {isError && (
++            <p className="py-8 text-center text-danger">
++              Failed to load products. Is the backend running?
++            </p>
++          )}
++
++          {!isLoading && !isError && products.length === 0 && (
++            <p className="py-8 text-center text-slate-500">No products found.</p>
++          )}
++
++          {!isLoading && !isError && products.length > 0 && (
++            <div className="space-y-3">
++              {products.map((product) => (
++                <div
++                  key={product.id}
++                  className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
++                >
++                  <div className="flex items-center gap-4">
++                    <div className="h-12 w-12 rounded-lg bg-slate-100 flex items-center justify-center">
++                      <Package className="h-6 w-6 text-slate-500" />
++                    </div>
++                    <div>
++                      <p className="font-medium">{product.name}</p>
++                      <p className="text-sm text-slate-500">SKU: {product.internalCode}</p>
++                    </div>
+                   </div>
+-                </div>
+-                <div className="flex items-center gap-6">
+-                  <div className="text-right">
+-                    <p className="font-medium">{100 + i * 10} units</p>
+-                    <p className="text-sm text-slate-500">In stock</p>
++                  <div className="flex items-center gap-6">
++                    <div className="text-right">
++                      <p className="font-medium">{product.currentStock} units</p>
++                      <p className="text-sm text-slate-500">In stock</p>
++                    </div>
++                    <Badge variant={product.currentStock < product.minimumStock ? "danger" : "success"}>
++                      {product.currentStock < product.minimumStock ? "Low Stock" : "In Stock"}
++                    </Badge>
++                    <Button variant="ghost" size="icon">
++                      <MoreVertical className="h-4 w-4" />
++                    </Button>
+                   </div>
+-                  <Badge variant={i === 1 ? "danger" : "success"}>
+-                    {i === 1 ? "Low Stock" : "In Stock"}
+-                  </Badge>
+-                  <Button variant="ghost" size="icon">
+-                    <MoreVertical className="h-4 w-4" />
+-                  </Button>
+                 </div>
+-              </div>
+-            ))}
+-          </div>
++              ))}
++            </div>
++          )}
+         </CardContent>
+       </Card>
+     </div>
+diff --git a/frontend/src/features/warehouses/pages/warehouses-page.tsx b/frontend/src/features/warehouses/pages/warehouses-page.tsx
+index afa5821..4037701 100644
+--- a/frontend/src/features/warehouses/pages/warehouses-page.tsx
++++ b/frontend/src/features/warehouses/pages/warehouses-page.tsx
+@@ -1,16 +1,23 @@
++import { useState } from "react"
++import { useQuery } from "@tanstack/react-query"
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+ import { Button } from "@/components/ui/button"
+ import { Input } from "@/components/ui/input"
+ import { Badge } from "@/components/ui/badge"
+ import { Progress } from "@/components/ui/progress"
+-import { 
+-  Search, 
+-  Plus, 
+-  Building2,
+-  MoreVertical
+-} from "lucide-react"
++import { Search, Plus, Building2, MoreVertical, Loader2 } from "lucide-react"
++import { warehousesService } from "@/services/api/warehouses.service"
+ 
+ export function WarehousesPage() {
++  const [search, setSearch] = useState("")
++
++  const { data, isLoading, isError } = useQuery({
++    queryKey: ["warehouses", { search }],
++    queryFn: () => warehousesService.getWarehouses({ search, page: 1, pageSize: 20 } as any),
++  })
++
++  const warehouses = data?.results ?? []
++
+   return (
+     <div className="space-y-6">
+       <div className="flex items-center justify-between">
+@@ -29,59 +36,79 @@ export function WarehousesPage() {
+         <CardContent className="pt-6">
+           <div className="relative">
+             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+-            <Input 
+-              placeholder="Search warehouses..." 
++            <Input
++              placeholder="Search warehouses..."
+               className="pl-10"
++              value={search}
++              onChange={(e) => setSearch(e.target.value)}
+             />
+           </div>
+         </CardContent>
+       </Card>
+ 
++      {isLoading && (
++        <div className="flex items-center justify-center py-12 text-slate-400">
++          <Loader2 className="h-6 w-6 animate-spin" />
++        </div>
++      )}
++
++      {isError && (
++        <p className="py-8 text-center text-danger">
++          Failed to load warehouses. Is the backend running?
++        </p>
++      )}
++
++      {!isLoading && !isError && warehouses.length === 0 && (
++        <p className="py-8 text-center text-slate-500">No warehouses found.</p>
++      )}
++
+       {/* Warehouses Grid */}
+-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+-        {[1, 2, 3, 4, 5, 6].map((i) => (
+-          <Card key={i} className="hover:shadow-md transition-shadow">
+-            <CardHeader>
+-              <div className="flex items-start justify-between">
+-                <div className="flex items-center gap-3">
+-                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+-                    <Building2 className="h-5 w-5 text-primary" />
+-                  </div>
+-                  <div>
+-                    <CardTitle className="text-lg">Warehouse {i}</CardTitle>
+-                    <CardDescription>WH-{1000 + i}</CardDescription>
+-                  </div>
+-                </div>
+-                <Button variant="ghost" size="icon">
+-                  <MoreVertical className="h-4 w-4" />
+-                </Button>
+-              </div>
+-            </CardHeader>
+-            <CardContent>
+-              <div className="space-y-4">
+-                <div>
+-                  <div className="flex items-center justify-between text-sm mb-2">
+-                    <span className="text-slate-500">Capacity</span>
+-                    <span className="font-medium">{70 + i * 5}%</span>
+-                  </div>
+-                  <Progress value={70 + i * 5} className="h-2" />
+-                </div>
+-                <div className="flex items-center justify-between">
+-                  <div>
+-                    <p className="text-sm text-slate-500">Products</p>
+-                    <p className="font-medium">{100 + i * 20}</p>
++      {!isLoading && !isError && warehouses.length > 0 && (
++        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
++          {warehouses.map((warehouse) => {
++            const total = warehouse.totalCapacity ?? warehouse.capacity ?? 0
++            const used = warehouse.usedCapacity ?? 0
++            const utilization = total > 0 ? Math.round((used / total) * 100) : 0
++
++            return (
++              <Card key={warehouse.id} className="hover:shadow-md transition-shadow">
++                <CardHeader>
++                  <div className="flex items-start justify-between">
++                    <div className="flex items-center gap-3">
++                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
++                        <Building2 className="h-5 w-5 text-primary" />
++                      </div>
++                      <div>
++                        <CardTitle className="text-lg">{warehouse.name}</CardTitle>
++                        <CardDescription>{warehouse.code}</CardDescription>
++                      </div>
++                    </div>
++                    <Button variant="ghost" size="icon">
++                      <MoreVertical className="h-4 w-4" />
++                    </Button>
+                   </div>
+-                  <div className="text-right">
+-                    <p className="text-sm text-slate-500">Zones</p>
+-                    <p className="font-medium">{3 + i}</p>
++                </CardHeader>
++                <CardContent>
++                  <div className="space-y-4">
++                    <div>
++                      <div className="flex items-center justify-between text-sm mb-2">
++                        <span className="text-slate-500">Capacity</span>
++                        <span className="font-medium">{utilization}%</span>
++                      </div>
++                      <Progress value={utilization} className="h-2" />
++                    </div>
++                    <div className="flex items-center justify-between">
++                      <Badge variant={warehouse.status === "active" ? "success" : "default"}>
++                        {warehouse.status === "active" ? "Active" : "Inactive"}
++                      </Badge>
++                    </div>
+                   </div>
+-                  <Badge variant="success">Active</Badge>
+-                </div>
+-              </div>
+-            </CardContent>
+-          </Card>
+-        ))}
+-      </div>
++                </CardContent>
++              </Card>
++            )
++          })}
++        </div>
++      )}
+     </div>
+   )
+ }
+diff --git a/frontend/src/services/api/dashboard.service.ts b/frontend/src/services/api/dashboard.service.ts
+new file mode 100644
+index 0000000..c358b8d
+--- /dev/null
++++ b/frontend/src/services/api/dashboard.service.ts
+@@ -0,0 +1,44 @@
++import type { DashboardStats, RecentActivity } from "@/types"
++import { apiClient } from "./client"
++
++interface OverviewStats {
++  totalProducts: number
++  totalWarehouses: number
++  totalStockValue: number
++  lowStockItems: number
++  pendingRequests: number
++  todayMovements: number
++}
++
++export const dashboardService = {
++  /** GET /api/dashboard/ */
++  async getOverviewStats(): Promise<DashboardStats> {
++    const response = await apiClient.get<OverviewStats>("/dashboard/")
++    const data = response.data
++    return {
++      totalProducts: data.totalProducts,
++      totalWarehouses: data.totalWarehouses,
++      totalStockValue: data.totalStockValue,
++      criticalStock: data.lowStockItems,
++      pendingRequests: data.pendingRequests,
++      recentMovements: data.todayMovements,
++      activeEmployees: 0,
++      lowStockProducts: data.lowStockItems,
++    }
++  },
++
++  /** GET /api/dashboard/recent_activity/ */
++  async getRecentActivity(limit = 10): Promise<RecentActivity[]> {
++    const response = await apiClient.get<
++      Array<{ action: string; entityType: string; userEmail: string; timestamp: string; description: string }>
++    >("/dashboard/recent_activity/", { params: { limit } })
++
++    return response.data.map((item, index) => ({
++      id: String(index),
++      user: item.userEmail,
++      action: item.action,
++      entity: item.entityType,
++      timestamp: item.timestamp,
++    }))
++  },
++}
+diff --git a/frontend/src/services/api/warehouses.service.ts b/frontend/src/services/api/warehouses.service.ts
+new file mode 100644
+index 0000000..f14198a
+--- /dev/null
++++ b/frontend/src/services/api/warehouses.service.ts
+@@ -0,0 +1,40 @@
++import type { Warehouse, WarehouseFormData, TableParams, PaginatedResponse } from "@/types"
++import { apiClient } from "./client"
++
++export const warehousesService = {
++  /** GET /api/warehouses/ */
++  async getWarehouses(params?: TableParams): Promise<PaginatedResponse<Warehouse>> {
++    const response = await apiClient.get<PaginatedResponse<Warehouse>>("/warehouses/", {
++      params: {
++        page: params?.page,
++        pageSize: params?.pageSize,
++        search: params?.search,
++        status: params?.status,
++      },
++    })
++    return response.data
++  },
++
++  /** GET /api/warehouses/{id}/ */
++  async getWarehouse(id: string): Promise<Warehouse> {
++    const response = await apiClient.get<Warehouse>(`/warehouses/${id}/`)
++    return response.data
++  },
++
++  /** POST /api/warehouses/ */
++  async createWarehouse(data: WarehouseFormData): Promise<Warehouse> {
++    const response = await apiClient.post<Warehouse>("/warehouses/", data)
++    return response.data
++  },
++
++  /** PATCH /api/warehouses/{id}/ */
++  async updateWarehouse(id: string, data: Partial<WarehouseFormData>): Promise<Warehouse> {
++    const response = await apiClient.patch<Warehouse>(`/warehouses/${id}/`, data)
++    return response.data
++  },
++
++  /** DELETE /api/warehouses/{id}/ */
++  async deleteWarehouse(id: string): Promise<void> {
++    await apiClient.delete(`/warehouses/${id}/`)
++  },
++}
+diff --git a/frontend/src/types/index.ts b/frontend/src/types/index.ts
+index 2aa85a7..289cd5a 100644
+--- a/frontend/src/types/index.ts
++++ b/frontend/src/types/index.ts
+@@ -106,6 +106,8 @@ export interface Warehouse {
+   code: string
+   location?: string
+   capacity?: number
++  totalCapacity?: number
++  usedCapacity?: number
+   managerId?: string
+   managerName?: string
+   status: "active" | "inactive"

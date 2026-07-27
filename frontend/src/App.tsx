@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Toaster } from "sonner"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { AuthLayout } from "@/components/layouts/auth-layout"
+import { ProtectedRoute } from "@/components/shared/protected-route"
 
 // Pages
 import { LoginPage } from "@/features/auth/pages/login-page"
@@ -34,7 +35,14 @@ function App() {
           <Route path="/activate/:token" element={<AuthLayout><ActivateAccountPage /></AuthLayout>} />
           
           {/* Protected Routes */}
-          <Route path="/" element={<MainLayout />}>
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="inventory" element={<ProductsPage />} />
