@@ -45,10 +45,14 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
     def post(self, request: Any, *args, **kwargs) -> Response:
         """Handle login and create login history."""
-        response = super().post(request, *args, **kwargs)
-        if response.status_code == status.HTTP_200_OK:
-            auth_service = AuthService()
-            auth_service.create_login_history(request.user, request)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        response = Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+        auth_service = AuthService()
+        auth_service.create_login_history(serializer.user, request)
+
         return response
 
 
