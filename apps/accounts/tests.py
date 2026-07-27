@@ -6,8 +6,6 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 
-from apps.accounts.models import User, Permission, RolePermission
-
 User = get_user_model()
 
 

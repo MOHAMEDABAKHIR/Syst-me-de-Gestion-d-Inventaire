@@ -2,11 +2,10 @@
 Business logic services for inventory app.
 """
 
-import qrcode
 from io import BytesIO
 
+import qrcode
 from django.core.files import File
-from django.utils.translation import gettext_lazy as _
 
 from apps.inventory.models import Brand, Product, Unit
 from common.services import BaseService

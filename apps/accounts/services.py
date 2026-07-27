@@ -3,16 +3,13 @@ Business logic services for accounts app.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.tokens import default_token_generator
 from django.utils import timezone
-from django.utils.encoding import force_str
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.translation import gettext_lazy as _
 
-from apps.accounts.models import LoginHistory, User
+from apps.accounts.models import LoginHistory
 from common.services import BaseService
 from common.utils import get_client_ip
 
@@ -68,7 +65,7 @@ class UserService(BaseService):
         logger.info(f"User invited: {user.email} by {inviter.email}")
         return user
 
-    def activate_user(self, token: str, password: str, avatar: Optional[Any] = None) -> User:
+    def activate_user(self, token: str, password: str, avatar: Any | None = None) -> User:
         """Activate user account with password and avatar."""
         user = self.get_queryset().get(invitation_token=token, status=User.Status.PENDING)
         user.set_password(password)

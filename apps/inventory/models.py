@@ -5,8 +5,8 @@ Inventory models including products, brands, and units.
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from core.models import BaseModel
 from common.validators import BarcodeValidator, InternalCodeValidator
+from core.models import BaseModel
 
 
 class Brand(BaseModel):

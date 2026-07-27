@@ -3,7 +3,7 @@ Email service using Resend.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -23,8 +23,8 @@ class EmailService:
         html_content: str,
         text_content: str = None,
         from_email: str = None,
-        cc: List[str] = None,
-        bcc: List[str] = None,
+        cc: list[str] = None,
+        bcc: list[str] = None,
     ) -> bool:
         """Send an email."""
         try:
@@ -55,7 +55,7 @@ class TemplateEmailService(EmailService):
         self,
         to_email: str,
         template_name: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         subject: str = None,
         from_email: str = None,
         language: str = None,
@@ -142,7 +142,7 @@ class LowStockEmailService(TemplateEmailService):
     def send_low_stock_alert(
         self,
         to_email: str,
-        products: List[Dict[str, Any]],
+        products: list[dict[str, Any]],
         warehouse_name: str,
     ) -> bool:
         """Send low stock alert email."""
@@ -247,7 +247,7 @@ class NotificationService:
     def send_low_stock_alert(
         self,
         to_email: str,
-        products: List[Dict[str, Any]],
+        products: list[dict[str, Any]],
         warehouse_name: str,
     ) -> bool:
         """Send low stock alert."""

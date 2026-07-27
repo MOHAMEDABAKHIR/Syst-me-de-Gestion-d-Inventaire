@@ -4,9 +4,7 @@ Serializers for inventory app.
 
 from rest_framework import serializers
 
-from apps.categories.models import Category
 from apps.inventory.models import Brand, Product, Unit
-from apps.suppliers.models import Supplier
 
 
 class BrandSerializer(serializers.ModelSerializer):

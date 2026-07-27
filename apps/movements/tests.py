@@ -3,13 +3,12 @@ Tests for movements app.
 """
 
 import pytest
-from rest_framework.test import APIClient
 
-from apps.movements.models import Movement, StockRequest
-from apps.inventory.models import Product
-from apps.categories.models import Category
-from apps.warehouses.models import Warehouse
 from apps.accounts.models import User
+from apps.categories.models import Category
+from apps.inventory.models import Product
+from apps.movements.models import Movement, StockRequest
+from apps.warehouses.models import Warehouse
 
 
 @pytest.mark.django_db

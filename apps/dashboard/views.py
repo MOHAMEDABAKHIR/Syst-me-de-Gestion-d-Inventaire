@@ -4,7 +4,7 @@ API views for dashboard app.
 
 from datetime import datetime
 
-from rest_framework import generics, status
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response

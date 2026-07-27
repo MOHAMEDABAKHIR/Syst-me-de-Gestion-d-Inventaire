@@ -10,7 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from apps.accounts.models import LoginHistory, Permission, RolePermission, User
+from apps.accounts.models import LoginHistory, Permission, RolePermission
 
 User = get_user_model()
 
@@ -131,7 +131,7 @@ class UserActivationSerializer(serializers.Serializer):
             if user.invitation_accepted_at:
                 raise serializers.ValidationError(_("Invitation already used."))
         except User.DoesNotExist:
-            raise serializers.ValidationError(_("Invalid or expired invitation token."))
+            raise serializers.ValidationError(_("Invalid or expired invitation token.")) from None
         return value
 
 

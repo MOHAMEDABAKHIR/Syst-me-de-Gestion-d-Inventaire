@@ -2,11 +2,10 @@
 Data selectors for stock app.
 """
 
-from django.db.models import Q
-
-from common.selectors import BaseSelector
+from django.db.models import F, Q
 
 from apps.stock.models import Stock, StockReservation
+from common.selectors import BaseSelector
 
 
 class StockSelector(BaseSelector):
@@ -28,15 +27,15 @@ class StockSelector(BaseSelector):
 
     def get_low_stock(self):
         """Get stocks below minimum level."""
-        return self.filter(quantity__lt=models.F("minimum_level"))
+        return self.filter(quantity__lt=F("minimum_level"))
 
     def get_reorder_stock(self):
         """Get stocks below reorder level."""
-        return self.filter(quantity__lt=models.F("reorder_level"))
+        return self.filter(quantity__lt=F("reorder_level"))
 
     def get_overstock(self):
         """Get stocks above maximum level."""
-        return self.filter(quantity__gt=models.F("maximum_level"))
+        return self.filter(quantity__gt=F("maximum_level"))
 
     def search_stock(self, query):
         """Search stock by product name or code."""

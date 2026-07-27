@@ -86,7 +86,6 @@ def validate_email(email: str) -> bool:
 
 def get_upload_path(instance: Any, filename: str) -> str:
     """Generate upload path for file storage."""
-    from django.utils.text import slugify
 
     model_name = instance.__class__.__name__.lower()
     sanitized_filename = sanitize_filename(filename)

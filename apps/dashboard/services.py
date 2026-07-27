@@ -3,9 +3,9 @@ Analytics and reporting services for dashboard.
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict
+from typing import Any
 
-from django.db.models import Count, Q, Sum, Avg, F
+from django.db.models import Count, F, Sum
 from django.db.models.functions import Coalesce
 
 from apps.inventory.models import Product
@@ -17,7 +17,7 @@ from apps.warehouses.models import Warehouse
 class DashboardService:
     """Service for dashboard analytics and reporting."""
 
-    def get_overview_stats(self) -> Dict[str, Any]:
+    def get_overview_stats(self) -> dict[str, Any]:
         """Get overview statistics for dashboard."""
         return {
             "total_products": Product.objects.filter(is_deleted=False).count(),
@@ -50,7 +50,7 @@ class DashboardService:
         ).values("code", "name", "total_quantity", "total_value")
         return list(warehouses)
 
-    def get_movement_stats(self, days: int = 30) -> Dict[str, Any]:
+    def get_movement_stats(self, days: int = 30) -> dict[str, Any]:
         """Get movement statistics for specified period."""
         since = datetime.now() - timedelta(days=days)
         movements = Movement.objects.filter(movement_date__gte=since, is_deleted=False)
@@ -75,7 +75,7 @@ class DashboardService:
         )
         return list(top_products)
 
-    def get_request_stats(self, days: int = 30) -> Dict[str, Any]:
+    def get_request_stats(self, days: int = 30) -> dict[str, Any]:
         """Get stock request statistics."""
         since = datetime.now() - timedelta(days=days)
         requests = StockRequest.objects.filter(requested_at__gte=since, is_deleted=False)
@@ -151,7 +151,7 @@ class DashboardService:
 class ReportService:
     """Service for generating reports."""
 
-    def generate_inventory_report(self, warehouse_id=None) -> Dict[str, Any]:
+    def generate_inventory_report(self, warehouse_id=None) -> dict[str, Any]:
         """Generate inventory report."""
         stocks = Stock.objects.filter(is_deleted=False)
         if warehouse_id:
@@ -177,7 +177,7 @@ class ReportService:
             ),
         }
 
-    def generate_movement_report(self, start_date, end_date, warehouse_id=None) -> Dict[str, Any]:
+    def generate_movement_report(self, start_date, end_date, warehouse_id=None) -> dict[str, Any]:
         """Generate movement report for date range."""
         movements = Movement.objects.filter(
             movement_date__date__range=[start_date, end_date],
@@ -204,7 +204,7 @@ class ReportService:
             ),
         }
 
-    def generate_request_report(self, start_date, end_date) -> Dict[str, Any]:
+    def generate_request_report(self, start_date, end_date) -> dict[str, Any]:
         """Generate stock request report."""
         requests = StockRequest.objects.filter(
             requested_at__date__range=[start_date, end_date],

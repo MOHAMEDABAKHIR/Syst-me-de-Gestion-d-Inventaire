@@ -3,13 +3,11 @@ Tests for stock app.
 """
 
 import pytest
-from rest_framework.test import APIClient
 
-from apps.stock.models import Stock, StockReservation
-from apps.inventory.models import Product
 from apps.categories.models import Category
+from apps.inventory.models import Product
+from apps.stock.models import Stock
 from apps.warehouses.models import Warehouse
-from apps.accounts.models import User
 
 
 @pytest.mark.django_db

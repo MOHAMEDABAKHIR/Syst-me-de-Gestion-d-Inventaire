@@ -5,10 +5,10 @@ Tests for inventory app.
 import pytest
 from rest_framework.test import APIClient
 
-from apps.inventory.models import Product, Brand, Unit
-from apps.categories.models import Category
-from apps.suppliers.models import Supplier
 from apps.accounts.models import User
+from apps.categories.models import Category
+from apps.inventory.models import Brand, Product, Unit
+from apps.suppliers.models import Supplier
 
 
 @pytest.mark.django_db

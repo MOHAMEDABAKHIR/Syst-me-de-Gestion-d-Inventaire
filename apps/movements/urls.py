@@ -2,7 +2,7 @@
 URL configuration for movements app.
 """
 
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from apps.movements.views import MovementViewSet, StockRequestViewSet

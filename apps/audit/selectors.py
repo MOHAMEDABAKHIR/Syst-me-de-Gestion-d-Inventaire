@@ -6,9 +6,8 @@ from datetime import datetime, timedelta
 
 from django.db.models import Q
 
-from common.selectors import BaseSelector
-
 from apps.audit.models import AuditLog
+from common.selectors import BaseSelector
 
 
 class AuditLogSelector(BaseSelector):

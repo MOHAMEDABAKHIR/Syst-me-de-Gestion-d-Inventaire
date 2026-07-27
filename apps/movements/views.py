@@ -2,7 +2,7 @@
 API views for movements app.
 """
 
-from rest_framework import generics, status
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -10,6 +10,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from apps.movements.models import Movement, StockRequest
 from apps.movements.permissions import CanApproveRequests, CanValidateMovements
+from apps.movements.selectors import StockRequestSelector
 from apps.movements.serializers import (
     MovementCreateSerializer,
     MovementSerializer,
@@ -17,8 +18,7 @@ from apps.movements.serializers import (
     StockRequestSerializer,
 )
 from apps.movements.services import MovementService, StockRequestService
-from apps.movements.selectors import MovementSelector, StockRequestSelector
-from common.permissions import IsActiveUser, IsMaintenanceManager, IsTechnician, IsWarehouseOperator
+from common.permissions import IsActiveUser, IsWarehouseOperator
 
 
 class MovementViewSet(ModelViewSet):

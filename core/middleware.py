@@ -3,7 +3,6 @@ Custom middleware for the application.
 """
 
 import logging
-from typing import Callable
 
 from django.http import HttpRequest, HttpResponse
 from django.utils.deprecation import MiddlewareMixin

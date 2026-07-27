@@ -7,16 +7,16 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_str
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.http import urlsafe_base64_decode
 from rest_framework import generics, status
-from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from apps.accounts.models import LoginHistory, Permission, RolePermission, User
+from apps.accounts.models import Permission, RolePermission
 from apps.accounts.permissions import CanInviteUsers, CanManageUsers, IsOwnerOrAdmin
+from apps.accounts.selectors import LoginHistorySelector, UserSelector
 from apps.accounts.serializers import (
     CustomTokenObtainPairSerializer,
     LoginHistorySerializer,
@@ -31,10 +31,8 @@ from apps.accounts.serializers import (
     UserSerializer,
     UserUpdateSerializer,
 )
-from apps.accounts.services import AuthService, PermissionService, UserService
-from apps.accounts.selectors import LoginHistorySelector, UserSelector
+from apps.accounts.services import AuthService, UserService
 from common.exceptions import NotFoundError, ValidationError
-from common.mixins import AuditMixin
 from common.permissions import IsActiveUser
 
 User = get_user_model()
@@ -199,13 +197,6 @@ class PasswordResetRequestView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data["email"]
-        user = User.objects.get(email=email)
-
-        # Generate password reset token
-        uid = urlsafe_base64_encode(force_str(user.pk).encode())
-        token = default_token_generator.make_token(user)
-
         # TODO: Send email with reset link
         # This will be handled by the notification service
 
@@ -239,7 +230,7 @@ class PasswordResetConfirmView(generics.GenericAPIView):
             return Response({"detail": "Password reset successfully."}, status=status.HTTP_200_OK)
 
         except (User.DoesNotExist, ValueError):
-            raise ValidationError("Invalid reset link.")
+            raise ValidationError("Invalid reset link.") from None
 
 
 class ResendInvitationView(generics.GenericAPIView):
@@ -252,14 +243,14 @@ class ResendInvitationView(generics.GenericAPIView):
         try:
             user = User.objects.get(id=id)
             user_service = UserService()
-            token = user_service.resend_invitation(user)
+            user_service.resend_invitation(user)
 
             # TODO: Send email with new invitation link
             # This will be handled by the notification service
 
             return Response({"detail": "Invitation resent successfully."}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-            raise NotFoundError("User not found.")
+            raise NotFoundError("User not found.") from None
 
 
 class UserActionView(generics.GenericAPIView):
@@ -282,7 +273,7 @@ class UserActionView(generics.GenericAPIView):
 
             return Response({"detail": f"User {action}ed successfully."}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-            raise NotFoundError("User not found.")
+            raise NotFoundError("User not found.") from None
 
 
 class PermissionListView(generics.ListAPIView):

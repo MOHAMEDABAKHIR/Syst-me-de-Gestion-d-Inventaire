@@ -2,11 +2,10 @@
 Data selectors for inventory app.
 """
 
-from django.db.models import Q
-
-from common.selectors import BaseSelector
+from django.db.models import F, Q
 
 from apps.inventory.models import Brand, Product, Unit
+from common.selectors import BaseSelector
 
 
 class ProductSelector(BaseSelector):
@@ -49,11 +48,11 @@ class ProductSelector(BaseSelector):
 
     def get_low_stock_products(self):
         """Get products below minimum stock."""
-        return self.filter(current_stock__lt=models.F("minimum_stock"))
+        return self.filter(current_stock__lt=F("minimum_stock"))
 
     def get_overstock_products(self):
         """Get products above maximum stock."""
-        return self.filter(current_stock__gt=models.F("maximum_stock"))
+        return self.filter(current_stock__gt=F("maximum_stock"))
 
 
 class BrandSelector(BaseSelector):

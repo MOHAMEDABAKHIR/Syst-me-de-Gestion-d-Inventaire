@@ -4,8 +4,6 @@ Custom permissions for inventory app.
 
 from rest_framework import permissions
 
-from common.permissions import IsWarehouseManager, IsWarehouseOperator
-
 
 class CanManageProducts(permissions.BasePermission):
     """Permission to manage products."""

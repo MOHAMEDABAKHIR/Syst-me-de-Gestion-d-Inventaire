@@ -2,7 +2,6 @@
 Business logic services for stock app.
 """
 
-from django.utils.translation import gettext_lazy as _
 
 from apps.stock.models import Stock, StockReservation
 from common.services import BaseService

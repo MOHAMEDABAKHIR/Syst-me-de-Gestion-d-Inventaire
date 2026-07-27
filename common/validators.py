@@ -2,7 +2,6 @@
 Custom validators for the application.
 """
 
-import re
 from typing import Any
 
 from django.core.exceptions import ValidationError

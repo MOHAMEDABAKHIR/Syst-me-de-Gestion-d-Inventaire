@@ -4,8 +4,6 @@ Custom permissions for movements app.
 
 from rest_framework import permissions
 
-from common.permissions import IsMaintenanceManager, IsWarehouseManager
-
 
 class CanApproveRequests(permissions.BasePermission):
     """Permission to approve stock requests."""

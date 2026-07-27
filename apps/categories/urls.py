@@ -3,7 +3,6 @@ URL configuration for categories app.
 """
 
 from django.urls import path
-from rest_framework_nested import routers
 
 from apps.categories.views import CategoryDetailView, CategoryListView, CategoryTreeView
 

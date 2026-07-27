@@ -2,9 +2,9 @@
 Custom exceptions for the application.
 """
 
-from typing import Any, Optional
+from typing import Any
 
-from rest_framework.exceptions import APIException, ValidationError as DRFValidationError
+from rest_framework.exceptions import APIException
 
 
 class BaseAPIException(APIException):
@@ -14,7 +14,7 @@ class BaseAPIException(APIException):
     default_detail: str = "A server error occurred."
     default_code: str = "error"
 
-    def __init__(self, detail: Any = None, code: Optional[str] = None) -> None:
+    def __init__(self, detail: Any = None, code: str | None = None) -> None:
         if detail is None:
             detail = self.default_detail
         if code is None:

@@ -2,11 +2,8 @@
 Business logic services for movements app.
 """
 
-from django.utils.translation import gettext_lazy as _
 
-from apps.movements.models import Movement, StockRequest, StockRequestItem
-from apps.stock.models import Stock
-from apps.stock.services import StockService
+from apps.movements.models import Movement, StockRequest
 from common.services import BaseService
 from common.utils import generate_unique_code
 

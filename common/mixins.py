@@ -6,7 +6,6 @@ from typing import Any
 
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 
 class AuditMixin:
@@ -64,7 +63,6 @@ class ExportMixin:
     def export_to_csv(self, queryset: Any) -> Response:
         """Export data to CSV format."""
         import csv
-        from io import StringIO
 
         from django.http import HttpResponse
 

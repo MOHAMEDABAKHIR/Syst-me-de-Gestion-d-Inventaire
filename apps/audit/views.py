@@ -6,8 +6,8 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
 from apps.audit.models import AuditLog, AuditLogArchive
-from apps.audit.serializers import AuditLogArchiveSerializer, AuditLogSerializer
 from apps.audit.selectors import AuditLogSelector
+from apps.audit.serializers import AuditLogArchiveSerializer, AuditLogSerializer
 from common.permissions import IsActiveUser, IsSuperAdmin
 
 

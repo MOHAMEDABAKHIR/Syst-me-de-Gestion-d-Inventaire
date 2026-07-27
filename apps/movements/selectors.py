@@ -4,9 +4,8 @@ Data selectors for movements app.
 
 from django.db.models import Q
 
-from common.selectors import BaseSelector
-
 from apps.movements.models import Movement, StockRequest
+from common.selectors import BaseSelector
 
 
 class MovementSelector(BaseSelector):

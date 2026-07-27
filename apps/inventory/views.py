@@ -14,8 +14,6 @@ from apps.inventory.serializers import (
     UnitSerializer,
 )
 from apps.inventory.services import BrandService, ProductService, UnitService
-from apps.inventory.selectors import BrandSelector, ProductSelector, UnitSelector
-from common.mixins import AuditMixin
 from common.permissions import IsActiveUser
 
 

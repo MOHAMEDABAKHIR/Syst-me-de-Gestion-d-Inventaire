@@ -2,13 +2,14 @@
 API views for stock app.
 """
 
-from rest_framework import generics, status
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from apps.stock.models import Stock, StockReservation
+from apps.stock.selectors import StockSelector
 from apps.stock.serializers import (
     StockCreateSerializer,
     StockReservationSerializer,
@@ -16,8 +17,7 @@ from apps.stock.serializers import (
     StockUpdateSerializer,
 )
 from apps.stock.services import StockReservationService, StockService
-from apps.stock.selectors import StockReservationSelector, StockSelector
-from common.permissions import IsActiveUser, IsWarehouseManager
+from common.permissions import IsActiveUser
 
 
 class StockViewSet(ModelViewSet):
